@@ -1,110 +1,345 @@
+# app.py - Gerador de Declaração de Margem (versão final com detalhes de consignados)
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from docx import Document
 from io import BytesIO
 from datetime import datetime
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from num2words import num2words
+import unicodedata
+import re
 
 # --- Configuração da página ---
 st.set_page_config(page_title="Gerador de Declaração de Margem", page_icon="💼", layout="centered")
-
 st.title("💼 Sistema de Geração de Declaração de Margem Consignável")
-st.write("Preencha as informações abaixo ou selecione um nome para gerar automaticamente a declaração.")
+st.write("Selecione um nome para gerar automaticamente a declaração.")
 
-# --- Conectar ao Google Sheets ---
+# --- Helpers ---
+def normalize_header(s: str) -> str:
+    """Normaliza cabeçalhos: remove acento, espaços extras e deixa em maiúsculas."""
+    if s is None:
+        return ""
+    s = str(s).strip().upper()
+    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("ASCII")
+    s = " ".join(s.split())
+    return s
+
+def parse_decimal(value) -> Decimal:
+    """
+    Converte várias formas de entrada em Decimal:
+    - números (int/float/Decimal)
+    - strings '1.973,46', '1973,46', '1,973.46', 'R$ 1.973,46', ''
+    Retorna Decimal com 2 casas (quantize).
+    """
+    if value is None:
+        return Decimal("0.00")
+    if isinstance(value, Decimal):
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if isinstance(value, int):
+        return Decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if isinstance(value, float):
+        # converte float para string para evitar problemas binários
+        return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    s = str(value).strip()
+    if s == "":
+        return Decimal("0.00")
+
+    # remove símbolo R$, espaços e NBSP
+    s = s.replace("R$", "").replace("r$", "")
+    s = s.replace("\u00A0", "").replace(" ", "")
+
+    if "." in s and "," in s:
+        last_dot = s.rfind(".")
+        last_comma = s.rfind(",")
+        if last_comma > last_dot:
+            # BR format: 1.973,46
+            s = s.replace(".", "")
+            s = s.replace(",", ".")
+        else:
+            # US format: 1,973.46 -> remove commas
+            s = s.replace(",", "")
+    else:
+        if "," in s and "." not in s:
+            s = s.replace(",", ".")
+        # else: keep
+
+    filtered = "".join(ch for ch in s if ch.isdigit() or ch in ".-+")
+    if filtered in ("", ".", "-", "+"):
+        return Decimal("0.00")
+    try:
+        d = Decimal(filtered)
+    except InvalidOperation:
+        return Decimal("0.00")
+    return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def extenso_brl(valor: Decimal) -> str:
+    """Converte Decimal para extenso em pt_BR."""
+    valor = Decimal(valor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    sinal = ""
+    if valor < 0:
+        sinal = "menos "
+        valor = abs(valor)
+    inteiro = int(valor)
+    centavos = int((valor - Decimal(inteiro)) * 100)
+    if inteiro == 0 and centavos == 0:
+        return "zero reais"
+    if centavos:
+        texto = f"{num2words(inteiro, lang='pt_BR')} reais e {num2words(centavos, lang='pt_BR')} centavos"
+    else:
+        texto = f"{num2words(inteiro, lang='pt_BR')} reais"
+    texto = re.sub(r"\s+", " ", texto).strip()
+    return f"{sinal}{texto}"
+
+def format_brl(valor: Decimal) -> str:
+    """Formata Decimal para 'R$ 1.234,56'."""
+    q = Decimal(valor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    s = f"{q:,.2f}"
+    s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
+
+def replace_in_doc(doc: Document, subs: dict):
+    """Substitui placeholders no docx (parágrafos + tabelas). Mantém quebras de linha '\n'."""
+    # parágrafos
+    for p in doc.paragraphs:
+        if not p.text:
+            continue
+        p_text = p.text
+        replaced_any = False
+        for chave, valor in subs.items():
+            if chave in p_text:
+                p_text = p_text.replace(chave, str(valor))
+                replaced_any = True
+        if replaced_any and p_text != p.text:
+            # tentar preservar runs: se runs contêm placeholders faz a substituição em runs
+            # caso contrário, reescrever parágrafo (pode perder formatação)
+            # aqui fazemos substituição por runs primeiro
+            replaced_in_runs = False
+            for run in p.runs:
+                run_text = run.text
+                for chave, valor in subs.items():
+                    if chave in run_text:
+                        run.text = run_text.replace(chave, str(valor))
+                        replaced_in_runs = True
+            if not replaced_in_runs:
+                # fallback: reescreve o parágrafo inteiro
+                # remover runs
+                for _ in range(len(p.runs)):
+                    p.runs[0]._element.getparent().remove(p.runs[0]._element)
+                # inserir texto (pode conter '\n' para quebras de linha dentro do parágrafo)
+                p.add_run(p_text)
+
+    # tabelas
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                cell_text = cell.text
+                replaced_any = False
+                for chave, valor in subs.items():
+                    if chave in cell_text:
+                        cell_text = cell_text.replace(chave, str(valor))
+                        replaced_any = True
+                if replaced_any and cell_text != cell.text:
+                    # limpar e inserir novo parágrafo (irá inserir o texto com eventuais '\n')
+                    cell._tc.clear_content()
+                    # caso tenha quebras de linha, criar vários parágrafos:
+                    if "\n" in cell_text:
+                        for i, line in enumerate(cell_text.split("\n")):
+                            if i == 0:
+                                cell.add_paragraph(line)
+                            else:
+                                cell.add_paragraph(line)
+                    else:
+                        cell.add_paragraph(cell_text)
+
+# --- Conexão com Google Sheets ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(creds)
 
-# Link da planilha
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1jRpDiEc9kaEDNAGjjE-afu1pS9S9xk31L5kzxMoTxo4/edit?gid=0#gid=0").sheet1
+sheet = client.open_by_url(
+    "https://docs.google.com/spreadsheets/d/1jRpDiEc9kaEDNAGjjE-afu1pS9S9xk31L5kzxMoTxo4/edit?gid=0"
+).sheet1
 
-# 👇 Importante: o cabeçalho começa na linha 2 da planilha
-data = sheet.get_all_records(head=2)
+# Cabeçalho está na linha 2 (conforme sua planilha)
+raw_records = sheet.get_all_records(head=2)
 
-# --- Interface amigável ---
-nomes = [linha["NOME"] for linha in data]
-nome_selecionado = st.selectbox("Selecione o nome do(a) aposentado(a)/pensionista:", nomes)
+if not raw_records:
+    st.error("A planilha não retornou registros. Verifique o head/linha de cabeçalho.")
+    st.stop()
+
+# --- Mapear cabeçalhos normalizados para nomes originais ---
+header_map = {}
+header_row = sheet.row_values(2)
+for h in header_row:
+    header_map[normalize_header(h)] = h
+
+def get_field(record, desired_name):
+    """Puxa campo do registro por nome desejado (flexível com acentos/variações)."""
+    key = header_map.get(normalize_header(desired_name))
+    if key and key in record:
+        return record.get(key)
+    for k in record.keys():
+        if normalize_header(k) == normalize_header(desired_name):
+            return record.get(k)
+    return None
+
+# --- Lista de nomes para o selectbox ---
+nomes = [get_field(r, "NOME") for r in raw_records]
+nomes = [n for n in nomes if n is not None and str(n).strip() != ""]
+
+nome_selecionado = st.selectbox("Selecione o nome:", nomes)
 
 if nome_selecionado:
-    pessoa = next((linha for linha in data if linha["NOME"] == nome_selecionado), None)
-    if pessoa:
-        # Conversão de valores numéricos (garantindo que vírgulas sejam tratadas)
-        try:
-            salario = float(str(pessoa["SALÁRIO"]).replace(".", "").replace(",", "."))
-        except:
-            salario = 0.0
+    # localizar o registro exato (comparação por string limpa)
+    pessoa = next((r for r in raw_records if str(get_field(r, "NOME")).strip() == str(nome_selecionado).strip()), None)
 
-        margem_total = salario * 0.3  # 30% do salário
+    if not pessoa:
+        st.error("Não foi possível localizar a pessoa selecionada.")
+    else:
+        # SALÁRIO (tenta variações)
+        raw_salario = get_field(pessoa, "SALÁRIO") or get_field(pessoa, "REMUNERAÇÃO") or get_field(pessoa, "SALARIO")
+        salario = parse_decimal(raw_salario)
 
-        # Pegar valores dos consignados e somar apenas os que tiverem número > 0
-        consignados = [
-            pessoa.get("CONSIGNADO 1", 0),
-            pessoa.get("CONSIGNADO 2", 0),
-            pessoa.get("CONSIGNADO 3", 0),
-            pessoa.get("CONSIGNADO 4", 0),
-            pessoa.get("CONSIGNADO 5", 0),
-        ]
+        # Se a planilha já tem coluna 'MARGEM 30%' preenchida, usar; senão calcular 30% do salário
+        raw_margem30 = get_field(pessoa, "MARGEM 30%") or get_field(pessoa, "MARGEM30%") or get_field(pessoa, "MARGEM30")
+        if raw_margem30 not in (None, ""):
+            margem_total = parse_decimal(raw_margem30)
+        else:
+            margem_total = (salario * Decimal("0.30")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        total_consignado = 0
-        for c in consignados:
-            try:
-                valor = float(str(c).replace(".", "").replace(",", "."))
-                total_consignado += valor
-            except:
+        # Vínculo (normalizar para documento)
+        vinculo_raw = get_field(pessoa, "VÍNCULO") or get_field(pessoa, "VINCULO") or ""
+        vinculo = str(vinculo_raw).strip()
+        vinculo_upper = vinculo.upper()
+        if "APOSEN" in vinculo_upper or "APOSENT" in vinculo_upper:
+            vinculo_doc = "APOSENTADA"
+        elif "PENSION" in vinculo_upper or "PENSIONISTA" in vinculo_upper:
+            vinculo_doc = "PENSIONISTA"
+        else:
+            vinculo_doc = vinculo if vinculo else "---"
+
+        # Matrícula e CPF
+        matricula = get_field(pessoa, "MATRÍCULA") or get_field(pessoa, "MATRICULA") or "---"
+        cpf = get_field(pessoa, "CPF") or "---"
+
+        # Ler consignados desta pessoa (somente colunas CONSIGNADO 1..5 conforme indicado)
+        consignados_vals = []
+        possiveis = ["CONSIGNADO 1", "CONSIGNADO1", "CONSIGNADO 2", "CONSIGNADO2",
+                     "CONSIGNADO 3", "CONSIGNADO3", "CONSIGNADO 4", "CONSIGNADO4",
+                     "CONSIGNADO 5", "CONSIGNADO5", "EMPRÉSTIMO 1", "EMPRESTIMO1",
+                     "EMPRÉSTIMO 2", "EMPRÉSTIMO2", "EMPRÉSTIMO 3", "EMPRÉSTIMO3",
+                     "EMPRÉSTIMO 4", "EMPRESTIMO4", "EMPRÉSTIMO 5", "EMPRESTIMO5"]
+        for nome_col in possiveis:
+            v = get_field(pessoa, nome_col)
+            if v is None or (isinstance(v, str) and v.strip() == ""):
                 continue
+            d = parse_decimal(v)
+            if d != Decimal("0.00"):
+                consignados_vals.append(d)
 
-        # Se tiver empréstimo, subtrai; se não tiver, mantém o valor de 30%
-        if total_consignado > 0:
-            margem_livre = margem_total - total_consignado
-            possui_emprestimo = True
+        # Também tenta colunas genéricas 'CONSIGNADO' caso haja apenas uma
+        if not consignados_vals:
+            single = get_field(pessoa, "CONSIGNADO") or get_field(pessoa, "EMPRESTIMO")
+            if single not in (None, ""):
+                d = parse_decimal(single)
+                if d != Decimal("0.00"):
+                    consignados_vals.append(d)
+
+        margem_comprometida = sum(consignados_vals, Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        margem_livre = (margem_total - margem_comprometida).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Preparar placeholders detalhados dos consignados:
+        # - CONSIGNADO1_NUM ... CONSIGNADO5_EXT
+        consignado_placeholders = {}
+        for i in range(1, 6):
+            if i <= len(consignados_vals):
+                val = consignados_vals[i-1]
+                consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = format_brl(val)
+                consignado_placeholders[f"{{{{CONSIGNADO{i}_EXT}}}}"] = extenso_brl(val)
+            else:
+                consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = ""
+                consignado_placeholders[f"{{{{CONSIGNADO{i}_EXT}}}}"] = ""
+
+        # Montar lista textual com quebras de linha para inserir no documento
+        if consignados_vals:
+            linhas = []
+            for idx, v in enumerate(consignados_vals, start=1):
+                linhas.append(f"Empréstimo {idx}: {format_brl(v)} ({extenso_brl(v)})")
+            consignados_lista_text = "\n".join(linhas)
         else:
-            margem_livre = margem_total
-            possui_emprestimo = False
+            consignados_lista_text = "Não possui empréstimos consignados."
 
-        # --- Exibição dos resultados ---
-        st.subheader("📊 Resumo dos Dados")
-        st.write(f"**Matrícula:** {pessoa['MATRÍCULA']}")
-        st.write(f"**CPF:** {pessoa['CPF']}")
-        st.write(f"**Salário:** R$ {salario:,.2f}")
-        st.write(f"**Margem Total (30%):** R$ {margem_total:,.2f}")
+        # Mostrar resumo
+        st.subheader("📊 Resumo (confira os valores)")
+        st.write(f"**Nome:** {nome_selecionado}")
+        st.write(f"**Vínculo:** {vinculo_doc}")
+        st.write(f"**Matrícula:** {matricula}")
+        st.write(f"**CPF:** {cpf}")
+        st.write(f"**Salário (num):** {format_brl(salario)}")
+        st.write(f"**Salário (extenso):** {extenso_brl(salario)}")
+        st.write(f"**Margem Total (30%):** {format_brl(margem_total)} ({extenso_brl(margem_total)})")
+        st.write(f"**Margem Comprometida (soma consignados):** {format_brl(margem_comprometida)} ({extenso_brl(margem_comprometida)})")
+        st.write(f"**Margem Livre (total - comprometida):** {format_brl(margem_livre)} ({extenso_brl(margem_livre)})")
 
-        if possui_emprestimo:
-            st.warning("💰 Este(a) aposentado(a)/pensionista possui empréstimo(s) ativo(s).")
-            st.write(f"**Total de Empréstimos:** R$ {total_consignado:,.2f}")
-            st.write(f"**Margem Livre (após empréstimos):** R$ {margem_livre:,.2f}")
-        else:
-            st.info("✅ Este(a) aposentado(a)/pensionista **não possui empréstimos ativos.**")
-            st.write(f"**Margem Livre:** R$ {margem_livre:,.2f}")
+        if margem_comprometida > margem_total:
+            st.warning("⚠️ A margem comprometida é maior que a margem total de 30% — o valor livre ficou negativo.")
 
-        # --- Geração do documento ---
+        # Botão de gerar Documento
         if st.button("📄 Gerar Declaração"):
-            doc = Document("DECLARAÇÃO_DE_MARGEM_MODELO.docx")
+            modelo = "DECLARAÇÃO_DE_MARGEM_MODELO.docx"
+            
+            try:
+                doc = Document(modelo)
+            except Exception as e:
+                st.error(f"Não foi possível abrir o modelo '{modelo}': {e}")
+                st.stop()
 
-            for p in doc.paragraphs:
-                if "XXXX" in p.text:
-                    p.text = p.text.replace("XXXX", pessoa["NOME"])
-                if "CPF. N° XXXX" in p.text:
-                    p.text = p.text.replace("CPF. N° XXXX", f"CPF Nº {pessoa['CPF']}")
-                if "R$ XXXX" in p.text:
-                    p.text = p.text.replace("R$ XXXX", f"R$ {salario:,.2f}")
-                if "R$ XXXXX" in p.text:
-                    p.text = p.text.replace("R$ XXXXX", f"R$ {total_consignado:,.2f}")
-                if "R$ XXX" in p.text:
-                    p.text = p.text.replace("R$ XXX", f"R$ {margem_livre:,.2f}")
+            # data em pt-BR curta no formato: '10 de novembro de 2025'
+            meses_pt = {
+                1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
+                7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+            }
+            hoje = datetime.now()
+            data_pt = f"{hoje.day} de {meses_pt[hoje.month]} de {hoje.year}"
 
-                data_atual = datetime.now().strftime("%d de %B de %Y")
-                if "DATA de MÊS de ANO" in p.text:
-                    p.text = p.text.replace("DATA de MÊS de ANO", data_atual)
+            substituicoes = {
+                "{{NOME}}": str(nome_selecionado),
+                "{{CPF}}": str(cpf),
+                "{{MATRICULA}}": str(matricula),
+                "{{VINCULO}}": str(vinculo_doc),
+                "{{SALARIO_NUM}}": format_brl(salario),
+                "{{SALARIO_EXT}}": extenso_brl(salario),
+                "{{MARGEM_TOTAL_NUM}}": format_brl(margem_total),
+                "{{MARGEM_TOTAL_EXT}}": extenso_brl(margem_total),
+                "{{MARGEM_COMPROMETIDA_NUM}}": format_brl(margem_comprometida),
+                "{{MARGEM_COMPROMETIDA_EXT}}": extenso_brl(margem_comprometida),
+                "{{MARGEM_LIVRE_NUM}}": format_brl(margem_livre),
+                "{{MARGEM_LIVRE_EXT}}": extenso_brl(margem_livre),
+                "{{DATA}}": data_pt,
+                # placeholder para a lista detalhada (com quebras de linha)
+                "{{CONSIGNADOS_LISTA}}": consignados_lista_text
+            }
 
+            # adicionar placeholders individuais CONSIGNADO1..5
+            substituicoes.update(consignado_placeholders)
+
+            # Aplica substituições no documento
+            replace_in_doc(doc, substituicoes)
+
+            # salva em buffer e oferece download
             buffer = BytesIO()
             doc.save(buffer)
             buffer.seek(0)
 
+            safe_name = re.sub(r"[^A-Za-z0-9 _-]", "", str(nome_selecionado))
+            file_name = f"Declaracao_{safe_name}.docx"
+
             st.success("✅ Declaração gerada com sucesso!")
             st.download_button(
-                label="⬇️ Baixar Declaração",
+                "⬇️ Baixar declaração",
                 data=buffer,
-                file_name=f"Declaracao_{pessoa['NOME']}.docx",
+                file_name=file_name,
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
