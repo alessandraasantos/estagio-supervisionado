@@ -1,0 +1,90 @@
+body {
+    margin: 0;
+    font-family: "Poppins", sans-serif;
+    background: #D9C819;
+}
+
+.container {
+    width: 850px;
+    max-width: 95%;
+    background: #fff9c4;
+    margin: 60px auto;
+    display: flex;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.left {
+    background: #232306;
+    color: white;
+    width: 40%;
+    padding: 50px 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 30px;
+}
+
+.btn-outline {
+    margin-top: 20px;
+    background: transparent;
+    border: 2px solid white;
+    color: white;
+    padding: 10px 40px;
+    border-radius: 20px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.forgot {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #dddddd;
+    text-decoration: none;
+}
+
+.right {
+    width: 60%;
+    padding: 50px 40px;
+    background: #fffde7;
+}
+
+.right h2 {
+    margin-top: 0;
+    color: #2f2f00;
+    font-weight: bold;
+}
+
+.right p {
+    margin-top: -5px;
+    margin-bottom: 25px;
+    color: #4a4a04;
+}
+
+input, .stTextInput>div>input {
+    width: 100% !important;
+    padding: 12px;
+    font-size: 15px;
+    border: none !important;
+    outline: none !important;
+    background: #dfc82b !important;
+    margin-bottom: 15px;
+    border-radius: 10px !important;
+    box-shadow: inset 0px 4px 2px rgba(0,0,0,0.15);
+}
+
+.btn {
+    width: 160px;
+    padding: 12px 0;
+    background: #232306;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+}
