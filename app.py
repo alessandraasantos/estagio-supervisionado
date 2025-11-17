@@ -12,6 +12,35 @@ import re
 
 # --- Configuração da página ---
 st.set_page_config(page_title="Gerador de Declaração de Margem", page_icon="💼", layout="centered")
+# --- Estilos personalizados ---
+st.markdown(
+    """
+    <style>
+    /* Cor de fundo da página */
+    .stApp {
+        background-color: #FFE992 !important;
+    }
+
+    /* Área dos botões */
+    .stButton>button {
+        background-color: #FFF4BC !important;
+        color: black !important;
+        border: 1px solid #d4be6a !important;
+        padding: 0.6rem 1.2rem !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+    }
+
+    /* Hover do botão */
+    .stButton>button:hover {
+        background-color: #ffe27a !important;
+        border-color: #c6a94d !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("💼 Sistema de Geração de Declaração de Margem Consignável")
 st.write("Selecione um nome para gerar automaticamente a declaração.")
 
