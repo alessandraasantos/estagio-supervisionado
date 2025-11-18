@@ -3,20 +3,41 @@ import pandas as pd
 import re
 import os
 
-st.set_page_config(page_title="GeraMargem - Cadastro", page_icon="📝")
+st.set_page_config(
+    page_title="GeraMargem - Cadastro",
+    page_icon="📝",
+    layout="centered"
+)
 
 # ---------------- ESTILO DA PÁGINA ----------------
 page_bg = """
 <style>
-body {
+
+html, body, .main, .block-container {
     background-color: #FFE992 !important;
 }
 
-/* CARD */
+/* REMOVE HEADERS E PADDING AUTOMÁTICO DO STREAMLIT */
+header, .stApp > header {
+    display: none !important;
+}
+
+.css-18e3th9, .css-1d391kg, .stMainBlockContainer {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Remove qualquer container que Streamlit coloca acima */
+.stApp {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* CARD PRINCIPAL */
 .card {
     width: 520px;
     margin: auto;
-    margin-top: 100px;
+    margin-top: 40px;
     background-color: #FFF4BC;
     padding: 40px 35px;
     border-radius: 18px;
@@ -25,9 +46,9 @@ body {
 }
 
 /* TÍTULOS */
-h2 {
-    font-weight: 700;
+h2, h3, h4 {
     color: #3D3D00 !important;
+    font-weight: bold;
 }
 
 p {
@@ -35,7 +56,7 @@ p {
 }
 
 /* INPUTS */
-.stTextInput>div>div>input, .stTextInput>div>div>textarea {
+.stTextInput>div>div>input {
     background-color: #FFF4BC !important;
     border-radius: 12px !important;
     border: 1px solid #E1D676 !important;
@@ -88,7 +109,7 @@ def senha_valida(senha):
         return False
     if not re.search(r"[0-9]", senha):
         return False
-    if not re.search(r"[\W_]", senha):
+    if not re.search(r"[\\W_]", senha):
         return False
     return True
 
@@ -96,19 +117,15 @@ def senha_valida(senha):
 if st.button("Cadastrar"):
     if not nome or not email or not senha:
         st.error("Preencha todos os campos.")
-    
     elif not senha_valida(senha):
         st.error("A senha deve ter 8 caracteres e incluir maiúsculas, minúsculas, números e símbolos.")
-    
     elif email in df["email"].values:
         st.warning("E-mail já cadastrado! Aguarde autorização do responsável.")
-    
     else:
-        novo = pd.DataFrame([[nome, email, senha, "nao"]], 
+        novo = pd.DataFrame([[nome, email, senha, "nao"]],
                             columns=["nome", "email", "senha", "autorizado"])
         df = pd.concat([df, novo], ignore_index=True)
         df.to_csv("users.csv", index=False)
-
         st.success("Cadastro realizado! Aguarde autorização para acessar o sistema.")
 
 st.markdown("</div>", unsafe_allow_html=True)
