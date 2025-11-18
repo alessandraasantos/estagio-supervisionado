@@ -112,13 +112,13 @@ senha = st.text_input("Senha (8 caracteres, incluindo maiúscula, minúscula, n�
 def senha_valida(senha):
     if len(senha) != 8:
         return False
-    if not re.search(r"[A-Z]", senha):
+    if not re.search(r"[A-Z]", senha):   # Maiúscula
         return False
-    if not re.search(r"[a-z]", senha):
+    if not re.search(r"[a-z]", senha):   # Minúscula
         return False
-    if not re.search(r"[0-9]", senha):
+    if not re.search(r"[0-9]", senha):   # Número
         return False
-    if not re.search(r"[\\W_]", senha):
+    if not re.search(r"[^\w]", senha):   # Símbolo (qualquer caractere que NÃO é letra/número/_)
         return False
     return True
 

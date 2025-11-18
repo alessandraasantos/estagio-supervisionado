@@ -1,4 +1,6 @@
 # app.py - Gerador de Declaração de Margem (versão final com detalhes de consignados)
+# --- Página inicial ---
+
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials

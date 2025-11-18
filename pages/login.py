@@ -101,7 +101,8 @@ if st.button("Entrar"):
             st.error("Senha incorreta.")
         else:
             st.success("Login realizado!")
-            st.switch_page("app.py")
+            st.switch_page("app")
+
     else:
         st.warning("E-mail não encontrado.")
 
