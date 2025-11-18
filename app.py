@@ -9,7 +9,7 @@ st.set_page_config(page_title="GeraMargem - Cadastro", page_icon="📝")
 page_bg = """
 <style>
 body {
-    background-color: #FFE992 !important;
+    background-color: #F0E130 !important;
 }
 
 /* Card */

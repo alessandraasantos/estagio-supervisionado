@@ -13,8 +13,26 @@ st.set_page_config(
 page_bg = """
 <style>
 
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+
+/* REMOVE O RETÂNGULO AUTOMÁTICO DO STREAMLIT */
+.block-container {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* APLICAR FONTE PERSONALIZADA SOMENTE NO TÍTULO */
+.geramargem-title {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 43px !important;
+    font-weight: 700 !important;
+    color: #3D3D00 !important;
+}
+
 html, body, .main, .block-container {
-    background-color: #FFE992 !important;
+    background-color: #FFE135  !important;
 }
 
 /* REMOVE HEADERS E PADDING AUTOMÁTICO DO STREAMLIT */
@@ -33,18 +51,6 @@ header, .stApp > header {
     padding-top: 0 !important;
 }
 
-/* CARD PRINCIPAL */
-.card {
-    width: 520px;
-    margin: auto;
-    margin-top: 40px;
-    background-color: #FFF4BC;
-    padding: 40px 35px;
-    border-radius: 18px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    text-align: center;
-}
-
 /* TÍTULOS */
 h2, h3, h4 {
     color: #3D3D00 !important;
@@ -57,7 +63,7 @@ p {
 
 /* INPUTS */
 .stTextInput>div>div>input {
-    background-color: #FFF4BC !important;
+    background-color: #FBEC5D !important;
     border-radius: 12px !important;
     border: 1px solid #E1D676 !important;
     padding: 10px !important;
@@ -65,7 +71,7 @@ p {
 
 /* BOTÃO */
 .stButton>button {
-    background-color: #3D3D00 !important;
+    background-color: #FBEC5D !important;
     color: white !important;
     padding: 10px 30px;
     border-radius: 20px;
@@ -76,6 +82,7 @@ p {
 
 .stButton>button:hover {
     background-color: #1F1F00 !important;
+    
 }
 </style>
 """
@@ -91,7 +98,9 @@ df = pd.read_csv("users.csv")
 # ---------------- INTERFACE ----------------
 st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-st.markdown("## 🔸 GeraMargem")
+# TÍTULO COM FONTE PERSONALIZADA
+st.markdown("<h2 class='geramargem-title'>GeraMargem</h2>", unsafe_allow_html=True)
+
 st.write("### Crie sua conta")
 st.write("Preencha os dados e aguarde autorização do responsável.")
 
