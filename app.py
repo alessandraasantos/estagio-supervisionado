@@ -32,8 +32,10 @@ def aplicar_fonte_arial_12(documento):
                         run.font.size = Pt(12)
 # <<< FIM DA ADIÇÃO >>>
 
+
 # --- Configuração da página ---
 st.set_page_config(page_title="Gerador de Declaração de Margem", page_icon="💼", layout="centered")
+
 # --- Estilos personalizados ---
 st.markdown(
     """
@@ -59,6 +61,7 @@ st.markdown(
 st.title("💼 Sistema de Geração de Declaração de Margem Consignável")
 st.write("Selecione um nome para gerar automaticamente a declaração.")
 
+
 # --- Helpers ---
 def normalize_header(s: str) -> str:
     if s is None:
@@ -67,6 +70,7 @@ def normalize_header(s: str) -> str:
     s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("ASCII")
     s = " ".join(s.split())
     return s
+
 
 def parse_decimal(value) -> Decimal:
     if value is None:
@@ -106,6 +110,7 @@ def parse_decimal(value) -> Decimal:
         return Decimal("0.00")
     return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+
 def extenso_brl(valor: Decimal) -> str:
     valor = Decimal(valor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     sinal = ""
@@ -123,12 +128,15 @@ def extenso_brl(valor: Decimal) -> str:
     texto = re.sub(r"\s+", " ", texto).strip()
     return f"{sinal}{texto}"
 
+
 def format_brl(valor: Decimal) -> str:
     q = Decimal(valor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     s = f"{q:,.2f}"
     s = s.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"R$ {s}"
 
+
+# --- ADIÇÃO — permitir negrito com <b> ... </b> ---
 def _create_runs_with_bold_tags(paragraph, text_with_tags: str):
     parts = re.split(r'(<b>.*?<\/b>)', text_with_tags)
     for part in parts:
@@ -136,9 +144,11 @@ def _create_runs_with_bold_tags(paragraph, text_with_tags: str):
             continue
         m = re.match(r'^<b>(.*?)</b>$', part)
         if m:
-            paragraph.add_run(m.group(1)).bold = True
+            run = paragraph.add_run(m.group(1))
+            run.bold = True
         else:
             paragraph.add_run(part)
+
 
 def replace_in_doc(doc: Document, subs: dict):
     for p in doc.paragraphs:
@@ -164,21 +174,11 @@ def replace_in_doc(doc: Document, subs: dict):
                     if chave in cell_text:
                         cell_text = cell_text.replace(chave, str(valor))
                         replaced_any = True
-                if replaced_any and cell_text != cell.text:
+                if replaced_any:
                     cell._tc.clear_content()
-                    if "\n" in cell_text:
-                        for line in cell_text.split("\n"):
-                            p_new = cell.add_paragraph()
-                            if "<b>" in line and "</b>" in line:
-                                _create_runs_with_bold_tags(p_new, line)
-                            else:
-                                p_new.add_run(line)
-                    else:
-                        p_new = cell.add_paragraph()
-                        if "<b>" in cell_text and "</b>" in cell_text:
-                            _create_runs_with_bold_tags(p_new, cell_text)
-                        else:
-                            p_new.add_run(cell_text)
+                    p_new = cell.add_paragraph()
+                    _create_runs_with_bold_tags(p_new, cell_text)
+
 
 def remove_comprometida_clause_if_no_consignados(doc: Document):
     target = ", com margem comprometida no valor de R$ {{CONSIGNADOS_LISTA}}, restando uma margem livre de R$ {{MARGEM_LIVRE_NUM}} ({{MARGEM_LIVRE_EXT}})"
@@ -188,6 +188,7 @@ def remove_comprometida_clause_if_no_consignados(doc: Document):
             for _ in range(len(p.runs)):
                 p.runs[0]._element.getparent().remove(p.runs[0]._element)
             p.add_run(new_text)
+
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -195,6 +196,8 @@ def remove_comprometida_clause_if_no_consignados(doc: Document):
                     new_text = cell.text.replace(target, ".")
                     cell._tc.clear_content()
                     cell.add_paragraph(new_text)
+
+
 
 # --- Conexão com Google Sheets ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -216,6 +219,7 @@ header_row = sheet.row_values(2)
 for h in header_row:
     header_map[normalize_header(h)] = h
 
+
 def get_field(record, desired_name):
     key = header_map.get(normalize_header(desired_name))
     if key and key in record:
@@ -224,6 +228,7 @@ def get_field(record, desired_name):
         if normalize_header(k) == normalize_header(desired_name):
             return record.get(k)
     return None
+
 
 nomes = [get_field(r, "NOME") for r in raw_records]
 nomes = [n for n in nomes if n is not None and str(n).strip() != ""]
@@ -248,9 +253,9 @@ if nome_selecionado:
         vinculo_raw = get_field(pessoa, "VÍNCULO") or get_field(pessoa, "VINCULO") or ""
         vinculo = str(vinculo_raw).strip()
         vinculo_upper = vinculo.upper()
-        if "APOSEN" in vinculo_upper or "APOSENT" in vinculo_upper:
+        if "APOSEN" in vinculo_upper:
             vinculo_doc = "APOSENTADA"
-        elif "PENSION" in vinculo_upper or "PENSIONISTA" in vinculo_upper:
+        elif "PENSION" in vinculo_upper:
             vinculo_doc = "PENSIONISTA"
         else:
             vinculo_doc = vinculo if vinculo else "---"
@@ -259,11 +264,18 @@ if nome_selecionado:
         cpf = get_field(pessoa, "CPF") or "---"
 
         consignados_vals = []
-        possiveis = ["CONSIGNADO 1", "CONSIGNADO1", "CONSIGNADO 2", "CONSIGNADO2",
-                     "CONSIGNADO 3", "CONSIGNADO3", "CONSIGNADO 4", "CONSIGNADO4",
-                     "CONSIGNADO 5", "CONSIGNADO5", "EMPRÉSTIMO 1", "EMPRESTIMO1",
-                     "EMPRÉSTIMO 2", "EMPRESTIMO2", "EMPRÉSTIMO 3", "EMPRESTIMO3",
-                     "EMPRÉSTIMO 4", "EMPRESTIMO4", "EMPRÉSTIMO 5", "EMPRESTIMO5"]
+        possiveis = [
+            "CONSIGNADO 1","CONSIGNADO1",
+            "CONSIGNADO 2","CONSIGNADO2",
+            "CONSIGNADO 3","CONSIGNADO3",
+            "CONSIGNADO 4","CONSIGNADO4",
+            "CONSIGNADO 5","CONSIGNADO5",
+            "EMPRÉSTIMO 1","EMPRESTIMO1",
+            "EMPRÉSTIMO 2","EMPRESTIMO2",
+            "EMPRÉSTIMO 3","EMPRESTIMO3",
+            "EMPRÉSTIMO 4","EMPRESTIMO4",
+            "EMPRÉSTIMO 5","EMPRESTIMO5"
+        ]
         for nome_col in possiveis:
             v = get_field(pessoa, nome_col)
             if v is None or (isinstance(v, str) and v.strip() == ""):
@@ -286,8 +298,9 @@ if nome_selecionado:
         for i in range(1, 6):
             if i <= len(consignados_vals):
                 val = consignados_vals[i-1]
-                num_sem_rs = format_brl(val).replace("R$ ", "").strip()
-                consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = num_sem_rs
+                num_full = format_brl(val)  # "R$ 123,45"
+                cons_text = f"<b>{num_full}</b>"  # <<< inteiro em negrito >>>
+                consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = cons_text
                 consignado_placeholders[f"{{{{CONSIGNADO{i}_EXT}}}}"] = extenso_brl(val)
             else:
                 consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = ""
@@ -295,22 +308,13 @@ if nome_selecionado:
 
         if consignados_vals:
             partes = []
-            partes_num_sem_tag = []
-            partes_extenso = []
             for v in consignados_vals:
-                num_text_full = format_brl(v)
-                num_sem_rs = num_text_full.replace("R$ ", "").strip()
+                num_full = format_brl(v)
                 ext_text = extenso_brl(v)
-                partes.append(f"<b>{num_sem_rs}</b> ({ext_text})")
-                partes_num_sem_tag.append(num_sem_rs)
-                partes_extenso.append(ext_text)
+                partes.append(f"<b>{num_full}</b> ({ext_text})")  # <<< FORMATO 1 >>>
             consignados_lista_text = ", ".join(partes)
-            consignados_lista_num_only = ", ".join(partes_num_sem_tag)
-            consignados_lista_ext_only = ", ".join(partes_extenso)
         else:
             consignados_lista_text = ""
-            consignados_lista_num_only = ""
-            consignados_lista_ext_only = ""
 
         st.subheader("📊 Resumo (confira os valores)")
         st.write(f"**Nome:** {nome_selecionado}")
@@ -328,7 +332,6 @@ if nome_selecionado:
 
         if st.button("📄 Gerar Declaração"):
             modelo = "DECLARAÇÃO_DE_MARGEM_MODELO.docx"
-            
             try:
                 doc = Document(modelo)
             except Exception as e:
@@ -339,25 +342,23 @@ if nome_selecionado:
                 remove_comprometida_clause_if_no_consignados(doc)
 
             meses_pt = {
-                1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
-                7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+                1: "janeiro",2: "fevereiro",3: "março",4: "abril",5: "maio",6: "junho",
+                7: "julho",8: "agosto",9: "setembro",10: "outubro",11: "novembro",12: "dezembro"
             }
             hoje = datetime.now()
             data_pt = f"{hoje.day} de {meses_pt[hoje.month]} de {hoje.year}"
 
             substituicoes = {
-                "{{NOME}}": str(nome_selecionado),
-                "{{CPF}}": str(cpf),
-                "{{MATRICULA}}": str(matricula),
-                "{{VINCULO}}": str(vinculo_doc),
-                "{{SALARIO_NUM}}": f"<b>{format_brl(salario).replace('R$ ', '').strip()}</b>",
+                "{{NOME}}": f"<b>{nome_selecionado}</b>",
+                "{{CPF}}": f"<b>{cpf}</b>",
+                "{{MATRICULA}}": f"<b>{matricula}</b>",
+                "{{VINCULO}}": f"<b>{vinculo_doc}</b>",
+                "{{SALARIO_NUM}}": f"<b>{format_brl(salario)}</b>",
                 "{{SALARIO_EXT}}": extenso_brl(salario),
-                "{{MARGEM_TOTAL_NUM}}": f"<b>{format_brl(margem_total).replace('R$ ', '').strip()}</b>",
+                "{{MARGEM_TOTAL_NUM}}": f"<b>{format_brl(margem_total)}</b>",
                 "{{MARGEM_TOTAL_EXT}}": extenso_brl(margem_total),
                 "{{CONSIGNADOS_LISTA}}": consignados_lista_text,
-                "{{CONSIGNADOS_LISTA_NUM_ONLY}}": consignados_lista_num_only,
-                "{{CONSIGNADOS_LISTA_EXT_ONLY}}": consignados_lista_ext_only,
-                "{{MARGEM_LIVRE_NUM}}": f"<b>{format_brl(margem_livre).replace('R$ ', '').strip()}</b>",
+                "{{MARGEM_LIVRE_NUM}}": f"<b>{format_brl(margem_livre)}</b>",
                 "{{MARGEM_LIVRE_EXT}}": extenso_brl(margem_livre),
                 "{{DATA}}": data_pt
             }
@@ -366,9 +367,7 @@ if nome_selecionado:
 
             replace_in_doc(doc, substituicoes)
 
-            # <<< ADIÇÃO: APLICAR ARIAL 12 EM TUDO >>>
             aplicar_fonte_arial_12(doc)
-            # <<< FIM >>>
 
             buffer = BytesIO()
             doc.save(buffer)
