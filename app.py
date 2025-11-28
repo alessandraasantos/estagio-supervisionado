@@ -58,7 +58,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("💼 Sistema de Geração de Declaração de Margem Consignável")
+st.title("💼 Gera Margem")
 st.write("Selecione um nome para gerar automaticamente a declaração.")
 
 
@@ -252,6 +252,19 @@ if nome_selecionado:
 
         vinculo_raw = get_field(pessoa, "VÍNCULO") or get_field(pessoa, "VINCULO") or ""
         vinculo = str(vinculo_raw).strip()
+
+        # <<< ADIÇÃO TRATAMENTO SR./SRA. >>>
+        sexo_raw = get_field(pessoa, "SEXO") or get_field(pessoa, "GENERO") or ""
+        sexo = str(sexo_raw).strip().upper()
+
+        if sexo.startswith("F"):
+            tratamento = "a Sra."
+        elif sexo.startswith("M"):
+            tratamento = "o Sr."
+        else:
+            tratamento = "a Sra."
+        # <<< FIM DA ADIÇÃO >>>
+
         vinculo_upper = vinculo.upper()
         if "APOSEN" in vinculo_upper:
             vinculo_doc = "APOSENTADA"
@@ -298,8 +311,8 @@ if nome_selecionado:
         for i in range(1, 6):
             if i <= len(consignados_vals):
                 val = consignados_vals[i-1]
-                num_full = format_brl(val)  # "R$ 123,45"
-                cons_text = f"<b>{num_full}</b>"  # <<< inteiro em negrito >>>
+                num_full = format_brl(val)
+                cons_text = f"<b>{num_full}</b>"
                 consignado_placeholders[f"{{{{CONSIGNADO{i}_NUM}}}}"] = cons_text
                 consignado_placeholders[f"{{{{CONSIGNADO{i}_EXT}}}}"] = extenso_brl(val)
             else:
@@ -311,13 +324,14 @@ if nome_selecionado:
             for v in consignados_vals:
                 num_full = format_brl(v)
                 ext_text = extenso_brl(v)
-                partes.append(f"<b>{num_full}</b> ({ext_text})")  # <<< FORMATO 1 >>>
+                partes.append(f"<b>{num_full}</b> ({ext_text})")
             consignados_lista_text = ", ".join(partes)
         else:
             consignados_lista_text = ""
 
         st.subheader("📊 Resumo (confira os valores)")
         st.write(f"**Nome:** {nome_selecionado}")
+        st.write(f"**Tratamento:** {tratamento}")
         st.write(f"**Vínculo:** {vinculo_doc}")
         st.write(f"**Matrícula:** {matricula}")
         st.write(f"**CPF:** {cpf}")
@@ -349,6 +363,7 @@ if nome_selecionado:
             data_pt = f"{hoje.day} de {meses_pt[hoje.month]} de {hoje.year}"
 
             substituicoes = {
+                "{{TRATAMENTO}}": tratamento,   # <<< AQUI FOI ADICIONADO >>>
                 "{{NOME}}": f"<b>{nome_selecionado}</b>",
                 "{{CPF}}": f"<b>{cpf}</b>",
                 "{{MATRICULA}}": f"<b>{matricula}</b>",
