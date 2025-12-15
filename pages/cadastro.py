@@ -3,96 +3,86 @@ import pandas as pd
 import re
 import os
 
+# ---------------- CONFIGURAÇÃO DA PÁGINA ----------------
 st.set_page_config(
     page_title="GeraMargem - Cadastro",
     page_icon="📝",
     layout="centered"
 )
 
-# ---------------- ESTILO DA PÁGINA ----------------
+# ---------------- ESTILO INSTITUCIONAL ----------------
 page_bg = """
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
 
-/* REMOVE O RETÂNGULO AUTOMÁTICO DO STREAMLIT */
-.block-container {
-    background: transparent !important;
-    box-shadow: none !important;
-    padding-top: 0 !important;
-    margin-top: 0 !important;
+/* FUNDO GERAL */
+html, body, .stApp {
+    background-color: #FFE992 !important;
 }
 
-/* APLICAR FONTE PERSONALIZADA SOMENTE NO TÍTULO */
-.geramargem-title {
-    font-family: 'Poppins', sans-serif !important;
-    font-size: 43px !important;
-    font-weight: 700 !important;
-    color: #3D3D00 !important;
-}
-
-html, body, .main, .block-container {
-    background-color: #FFE992  !important;
-}
-
-/* REMOVE HEADERS E PADDING AUTOMÁTICO DO STREAMLIT */
+/* REMOVE HEADER PADRÃO */
 header, .stApp > header {
     display: none !important;
 }
 
-.css-18e3th9, .css-1d391kg, .stMainBlockContainer {
-    padding-top: 0 !important;
-    margin-top: 0 !important;
+/* ÁREA DE CONTEÚDO */
+.content-area {
+    max-width: 520px;
+    margin: 0 auto;
+    padding-top: 90px;
+    padding-bottom: 40px;
 }
 
-/* Remove qualquer container que Streamlit coloca acima */
-.stApp {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-}
-
-/* TÍTULOS */
-h2, h3, h4 {
+/* TÍTULO PRINCIPAL */
+.geramargem-title {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 42px !important;
+    font-weight: 700 !important;
     color: #3D3D00 !important;
-    font-weight: bold;
+    margin-bottom: 12px;
 }
 
+/* TEXTOS */
 p {
     color: #5A5A00;
 }
 
 /* INPUTS */
-.stTextInput>div>div>input {
-    background-color: #FFFDF5 !important; /* branco */
-    color: #3D3D00 !important;            /* texto escuro */
-    border-radius: 12px !important;
-    border: 1px solid #E1D676 !important; /* mantém o tom amarelado */
+.stTextInput > div > div > input {
+    background-color: #FFFDF5 !important;
+    color: #3D3D00 !important;
+    border-radius: 6px !important;
+    border: 1px solid #D6C97A !important;
     padding: 10px !important;
 }
 
-/* Placeholder (texto dentro do input) */
-.stTextInput>div>div>input::placeholder {
+/* PLACEHOLDER */
+.stTextInput > div > div > input::placeholder {
     color: #9E9E9E !important;
-
 }
 
-/* BOTÃO */
-.stButton>button {
-    background-color: #FFFDF5 !important;
-    color: white !important;
-    padding: 10px 30px;
-    border-radius: 20px;
-    font-weight: bold;
+/* BOTÃO – AÇÃO PRINCIPAL */
+.stButton > button {
+    background-color: #2E2E00 !important; /* verde-oliva bem escuro */
+    color: #FFFFFF !important;            /* TEXTO BRANCO (fix definitivo) */
+    padding: 12px 36px;
+    border-radius: 6px;
+    font-weight: 700;
     border: none;
-    transition: 0.2s;
+    cursor: pointer;
 }
 
-.stButton>button:hover {
+/* HOVER */
+.stButton > button:hover {
     background-color: #1F1F00 !important;
-    
 }
+
+}
+
 </style>
 """
+
 st.markdown(page_bg, unsafe_allow_html=True)
 
 # ---------------- BANCO DE DADOS ----------------
@@ -102,34 +92,34 @@ if not os.path.exists("users.csv"):
 
 df = pd.read_csv("users.csv")
 
+# ---------------- FUNÇÃO DE VALIDAÇÃO DE SENHA ----------------
+def senha_valida(senha):
+    if len(senha) != 8:
+        return False
+    if not re.search(r"[A-Z]", senha):
+        return False
+    if not re.search(r"[a-z]", senha):
+        return False
+    if not re.search(r"[0-9]", senha):
+        return False
+    if not re.search(r"[^\w]", senha):
+        return False
+    return True
+
 # ---------------- INTERFACE ----------------
-st.markdown("<div class='card'>", unsafe_allow_html=True)
+st.markdown("<div class='content-area'>", unsafe_allow_html=True)
 
-# TÍTULO COM FONTE PERSONALIZADA
 st.markdown("<h2 class='geramargem-title'>GeraMargem</h2>", unsafe_allow_html=True)
-
 st.write("### Crie sua conta")
 st.write("Preencha os dados e aguarde autorização do responsável.")
 
 nome = st.text_input("Nome completo")
 email = st.text_input("E-mail")
-senha = st.text_input("Senha (8 caracteres, incluindo maiúscula, minúscula, número e símbolo)", type="password")
+senha = st.text_input(
+    "Senha (8 caracteres, incluindo maiúscula, minúscula, número e símbolo)",
+    type="password"
+)
 
-# ---------------- VALIDAÇÃO DE SENHA ----------------
-def senha_valida(senha):
-    if len(senha) != 8:
-        return False
-    if not re.search(r"[A-Z]", senha):   # Maiúscula
-        return False
-    if not re.search(r"[a-z]", senha):   # Minúscula
-        return False
-    if not re.search(r"[0-9]", senha):   # Número
-        return False
-    if not re.search(r"[^\w]", senha):   # Símbolo (qualquer caractere que NÃO é letra/número/_)
-        return False
-    return True
-
-# ---------------- BOTÃO DE CADASTRO ----------------
 if st.button("Cadastrar"):
     if not nome or not email or not senha:
         st.error("Preencha todos os campos.")
