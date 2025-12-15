@@ -24,7 +24,7 @@ header, .stApp > header {
 
 /* FUNDO IGUAL AO CADASTRO */
 html, body, .main, .block-container {
-    background-color: #FFE135 !important;
+    background-color: #FFE992 !important;
 }
 
 /* TÍTULO PADRONIZADO */

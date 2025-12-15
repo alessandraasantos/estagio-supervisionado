@@ -32,7 +32,7 @@ page_bg = """
 }
 
 html, body, .main, .block-container {
-    background-color: #FFE135  !important;
+    background-color: #FFE992  !important;
 }
 
 /* REMOVE HEADERS E PADDING AUTOMÁTICO DO STREAMLIT */
@@ -63,15 +63,22 @@ p {
 
 /* INPUTS */
 .stTextInput>div>div>input {
-    background-color: #FBEC5D !important;
+    background-color: #FFFDF5 !important; /* branco */
+    color: #3D3D00 !important;            /* texto escuro */
     border-radius: 12px !important;
-    border: 1px solid #E1D676 !important;
+    border: 1px solid #E1D676 !important; /* mantém o tom amarelado */
     padding: 10px !important;
+}
+
+/* Placeholder (texto dentro do input) */
+.stTextInput>div>div>input::placeholder {
+    color: #9E9E9E !important;
+
 }
 
 /* BOTÃO */
 .stButton>button {
-    background-color: #FBEC5D !important;
+    background-color: #FFFDF5 !important;
     color: white !important;
     padding: 10px 30px;
     border-radius: 20px;

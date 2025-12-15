@@ -13,6 +13,16 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from num2words import num2words
 import unicodedata
 import re
+import streamlit as st
+
+# ---------- SESSÃO ----------
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+
+ 
+
 
 # <<< ADIÇÃO — FUNÇÃO PARA FORÇAR ARIAL 12 EM TODO DOCUMENTO >>>
 def aplicar_fonte_arial_12(documento):
