@@ -63,8 +63,8 @@ p {
 
 /* BOTÃO – AÇÃO PRINCIPAL */
 .stButton > button {
-    background-color: #4C4C00 !important; /* MUDANÇA AQUI: de #2E2E00 para #4C4C00 */
-    color: #FFFFFF !important;
+    background-color: FFFFFF  !important; /* MUDANÇA AQUI: de #2E2E00 para #4C4C00 */
+    color: #4C4C00 !important;
     padding: 12px 36px;
     border-radius: 6px;
     font-weight: 700;
