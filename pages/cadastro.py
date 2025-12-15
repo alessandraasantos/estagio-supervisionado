@@ -50,8 +50,8 @@ p {
 
 /* INPUTS */
 .stTextInput > div > div > input {
-    background-color: #FFFDF5 !important;
-    color: #3D3D00 !important;
+    background-color: #FFFFFF !important;
+    color: #4C4C00 !important;
     border-radius: 6px !important;
     border: 1px solid #D6C97A !important;
     padding: 10px !important;
@@ -64,8 +64,8 @@ p {
 
 /* BOTÃO – AÇÃO PRINCIPAL */
 .stButton > button {
-    background-color: #2E2E00 !important; /* verde-oliva bem escuro */
-    color: #FFFFFF !important;            /* TEXTO BRANCO (fix definitivo) */
+    background-color:  #FFFFFF !important;  
+    color: #4C4C00 !important;            
     padding: 12px 36px;
     border-radius: 6px;
     font-weight: 700;
