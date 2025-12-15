@@ -190,22 +190,30 @@ def replace_in_doc(doc: Document, subs: dict):
                     _create_runs_with_bold_tags(p_new, cell_text)
 
 
-def remove_comprometida_clause_if_no_consignados(doc: Document):
-    target = ", com margem comprometida no valor de R$ {{CONSIGNADOS_LISTA}}, restando uma margem livre de R$ {{MARGEM_LIVRE_NUM}} ({{MARGEM_LIVRE_EXT}})"
+def ajustar_texto_sem_consignados(doc: Document):
+    """
+    Remove APENAS o trecho:
+    ', com margem comprometida no valor de ..., restando uma margem livre de ...'
+    mantendo o resto do texto intacto e SEM duplicar parágrafos.
+    """
+
+    padrao = re.compile(
+        r",\s*com margem comprometida no valor de.*?(\.)",
+        flags=re.IGNORECASE
+    )
+
     for p in doc.paragraphs:
-        if target in p.text:
-            new_text = p.text.replace(target, ".")
+        if "Gerando uma MARGEM CONSIGNÁVEL" in p.text:
+            novo_texto = padrao.sub(".", p.text)
+
+            # limpa runs antigos
             for _ in range(len(p.runs)):
                 p.runs[0]._element.getparent().remove(p.runs[0]._element)
-            p.add_run(new_text)
 
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                if target in cell.text:
-                    new_text = cell.text.replace(target, ".")
-                    cell._tc.clear_content()
-                    cell.add_paragraph(new_text)
+            p.add_run(novo_texto)
+            break
+
+
 
 
 
@@ -363,7 +371,8 @@ if nome_selecionado:
                 st.stop()
 
             if not consignados_vals:
-                remove_comprometida_clause_if_no_consignados(doc)
+                ajustar_texto_sem_consignados(doc)
+
 
             meses_pt = {
                 1: "janeiro",2: "fevereiro",3: "março",4: "abril",5: "maio",6: "junho",
