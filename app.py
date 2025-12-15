@@ -44,13 +44,15 @@ def aplicar_fonte_arial_12(documento):
 
 
 # --- Configuração da página ---
-st.set_page_config(page_title="Gerador de Declaração de Margem", page_icon="💼", layout="centered")
-
-# --- Estilos personalizados ---
 st.markdown(
     """
     <style>
-    .stApp { background-color: #FFE992 !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+
+    .stApp {
+        background-color: #FFE992 !important;
+    }
+
     .stButton>button {
         background-color: #FFF4BC !important;
         color: black !important;
@@ -59,17 +61,69 @@ st.markdown(
         border-radius: 8px !important;
         font-weight: bold !important;
     }
+
     .stButton>button:hover {
         background-color: #ffe27a !important;
         border-color: #c6a94d !important;
+    }
+
+    .geramargem-title {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 44px !important;
+    font-weight: 700 !important;
+    color: #3D3D00 !important;
+    margin-top: 400px;   /* mais espaço ANTES */
+    margin-bottom: 400px; /* mais espaço DEPOIS */
+    text-align: center;
+}
+
+.geramargem-subtitle {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 16px !important;
+    font-weight: 400 !important;
+    color: #4A4A00 !important;
+    text-align: center;
+    margin-top: 40px;   /* mais espaço ANTES */
+    margin-bottom: 40px; /* mais espaço DEPOIS */
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.geramargem-subtitle-secondary {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    color: #6B6B00 !important;
+    text-align: center;
+    margin-top: 40px;   /* mais espaço ANTES */
+    margin-bottom: 40px; /* mais espaço DEPOIS */
+    margin-bottom: 40px; /* espaço antes do selectbox */
+}
+
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.title("💼 Gera Margem")
-st.write("Selecione um nome para gerar automaticamente a declaração.")
+st.markdown(
+    "<h2 class='geramargem-title'>GeraMargem</h2>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    """
+    <div class="geramargem-subtitle">
+        Bem-vindo ao <b>GeraMargem</b>! Utilize esta ferramenta para gerar declarações
+        de margem consignável de forma rápida e prática.
+    </div>
+
+    <div class="geramargem-subtitle-secondary">
+        Selecione um nome abaixo para gerar automaticamente a declaração.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 
 # --- Helpers ---
